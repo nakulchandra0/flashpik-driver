@@ -1,0 +1,713 @@
+
+import * as React from 'react';
+import {
+    Text,
+    View,
+    StyleSheet,
+    Image,
+    Dimensions,
+    StatusBar,
+    Alert,
+    TouchableHighlight,
+    ImageBackground,
+    TextInput,
+    ScrollView,
+    TouchableOpacity,
+    FlatList,
+    Keyboard,
+    TouchableWithoutFeedback,
+    Animated
+} from 'react-native';
+
+import MapView, {
+    Marker,
+    Callout,
+    CalloutSubview,
+    ProviderPropType, PROVIDER_GOOGLE
+} from 'react-native-maps';
+
+import Carousel, { Pagination } from 'react-native-snap-carousel';
+import Geolocation from '@react-native-community/geolocation';
+import Geocoder from 'react-native-geocoder';
+import MapViewDirections from 'react-native-maps-directions';
+import marker from '../../../assets/img/pin_pick.png';
+import markerDrop from '../../../assets/img/pin_drop.png';
+import { Button, Input, CheckBox } from 'react-native-elements';
+import Modal from "react-native-modal";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { CountdownCircleTimer } from 'react-native-countdown-circle-timer';
+
+/* common components */
+import GeneralStatusBar from '../../component/statusbar/index';
+import RetroMapStyles from '../../component/RetroMapStyles.json';
+import CustomCallout from '../../component/callout';
+import Color from '../../component/color';
+import Font from '../../component/font';
+import Header from '../../component/header';
+import styles from './styles';
+import ApiService from "../../config/ApiService";
+import Utility from "../../config/utility";
+import Config from '../../config/config';
+import { addItem } from '../../config/addToFirebase';
+import { db } from '../../config/db';
+
+
+import PropTypes from 'prop-types';
+import { ParallaxImage } from 'react-native-snap-carousel';
+import SwithToggle from 'react-native-switch-toggle';
+import AsyncStorage from '@react-native-community/async-storage';
+import Spinner from 'react-native-loading-spinner-overlay';
+import { duration } from 'moment';
+
+const { width, height } = Dimensions.get('window');
+const ASPECT_RATIO = width / height;
+const LATITUDE = 0;
+const LONGITUDE = 0;
+const LATITUDE_DELTA = 0.005;
+const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+
+const GOOGLE_MAPS_APIKEY = 'AIzaSyDi5VGZuYU7nnEX6WYj1DrAJygtagR3i2M';
+
+// import Slider from './slider';
+const IS_ANDROID = Platform.OS === 'android';
+const SLIDER_1_FIRST_ITEM = 0;
+const { width: viewportWidth, height: viewportHeight } = Dimensions.get('window');
+
+function wp(percentage) {
+    const value = (percentage * viewportWidth) / 50;
+    return Math.round(value);
+}
+
+const slideHeight = viewportHeight * 0.36;
+const slideWidth = 0;
+const itemHorizontalMargin = width * 0.5;
+const sliderWidth = viewportWidth;
+const itemWidth = slideWidth + itemHorizontalMargin * 2;
+
+let itemRef = db.ref('/drivers');
+
+export default class Welcome extends React.PureComponent {
+    constructor(props) {
+        super(props);
+        apiService = new ApiService();
+        viewUtils = new Utility();
+        //const { navigation } = props;
+
+        this.state = {
+            isModalVisible: false,
+            slider1ActiveSlide: SLIDER_1_FIRST_ITEM,
+            keyboardSpace: '',
+            banner: [
+                {
+                    "id": "1",
+                    "customer_profile": "",
+                    "customer_name": "Love Chauhan",
+                    "payment_method": "Google Pay",
+                    "total_order_price": "200.00",
+                    "order_distance": "5.5 Km",
+                    "pic_up_location": "46, Angle Arcade, Opp Kalupur Co-Operative Bank, Sold Rd, Ahmedabad, Gujrat 380041",
+                    "drop_location": "46, ABC Tower, Gurukul road, Ghatlodiya, Ahmedabad, Gujrat 380041",
+                    "route": "Trips",
+                    "pickup_lat_long": "22.996531,72.505525", 
+                    "drop_lat_long": "23.002976,72.500915",
+                    "accept_time":'10',
+                },
+                {
+                    "id": "2",
+                    "customer_profile": "",
+                    "customer_name": "Nakul Chandra",
+                    "payment_method": "Paytm",
+                    "total_order_price": "500.00",
+                    "order_distance": "7.5 Km",
+                    "pic_up_location": "46, Angle Arcade, Opp Kalupur Co-Operative Bank, Sold Rd, Ahmedabad, Gujrat 380041",
+                    "drop_location": "46, ABC Tower, Gurukul road, Ghatlodiya, Ahmedabad, Gujrat 380041",
+                    "route": "Trips",
+                    "pickup_lat_long": "23.019551,72.504664", 
+                    "drop_lat_long": "23.027212,72.507358",
+                    "accept_time":'25',
+                },
+                {
+                    "id": "3",
+                    "customer_profile": "",
+                    "customer_name": "Nakul Chandra",
+                    "payment_method": "Cash",
+                    "total_order_price": "300.00",
+                    "order_distance": "7.5 Km",
+                    "pic_up_location": "46, Angle Arcade, Opp Kalupur Co-Operative Bank, Sold Rd, Ahmedabad, Gujrat 380041",
+                    "drop_location": "46, ABC Tower, Gurukul road, Ghatlodiya, Ahmedabad, Gujrat 380041",
+                    "route": "Trips",
+                    "pickup_lat_long": "23.000664,72.499790", 
+                    "drop_lat_long": "23.000703,72.495447",
+                    "accept_time":'50',
+                },
+            ],
+
+            region: {
+                latitude: LATITUDE,
+                longitude: LONGITUDE,
+                latitudeDelta: LATITUDE_DELTA,
+                longitudeDelta: LONGITUDE_DELTA,
+            },
+            coordinates: [
+                {
+                    latitude: 23.019551, 
+                    longitude:  72.504664,
+                },
+                {
+                    latitude: 23.027212, 
+                    longitude: 72.507358
+                },
+            ],
+
+            markers: [
+                {
+                    coordinates: {
+                        latitude: 22.996531,
+                        longitude: 72.505525
+                    },
+                },
+                {
+                    coordinates: {
+                        latitude: 23.002976,
+                        longitude: 72.500915
+                    },
+                },
+                {
+                    coordinates: {
+                        latitude: 23.000664,
+                        longitude: 72.499790
+                    },
+                },
+                {
+                    coordinates: {
+                        latitude: 23.000703,
+                        longitude: 72.495447
+                    },
+                }
+            ],
+            pickLocation: "46, Angle Arcade, Coraporate Road",
+            dropLocation: "46, ABC Tower Gurukul Road",
+            selectedVehicle: "Activa",
+            isModalVisibleInfo: false,
+            isModalVisibleContact: false,
+            keyboardSpace: '',
+
+            listData: [],
+            notification: [],
+
+            orderid :null,
+            vehicleid : null,
+            driverid : null,
+
+            hide: false,
+            ignoredId: null,
+
+            status: null,
+
+            items: [],
+            // status: null
+            latitude: null,
+            longitude: null,
+
+            isShowLocation: false,
+            forceRefresh: null,
+
+            show: true
+        };
+
+        this.mapView = null;
+        if (Platform.OS == "ios") {
+            Keyboard.addListener('keyboardDidShow', frames => {
+                if (!frames.endCoordinates) return;
+                this.setState({ keyboardSpace: frames.endCoordinates.height });
+            });
+        }
+
+        Keyboard.addListener('keyboardDidHide', frames => {
+            this.setState({ keyboardSpace: '' });
+        });
+
+        this.currentLocation = this.currentLocation.bind(this);
+    }
+
+    async componentDidUpdate(prevProps, prevState) {
+        const params = this.props.navigation.state.params;
+    
+        params == undefined ? '' :  
+        prevProps.navigation.state.params !== undefined ? 
+        params.notification.orderid !== prevProps.navigation.state.params.notification.orderid ? 
+        this.getNotification() : "" : this.getNotification();   
+        
+        // await AsyncStorage.getItem('@status') == "Online" ?
+        // this.setState({switchOn: true }) :
+        // this.setState({switchOn: false });
+
+        // if(this.state.notification.length !== 0) {
+        //     this.setState({
+        //         coordinates: [
+        //             {
+        //                 latitude: JSON.parse(this.state.notification[this.state.slider1ActiveSlide].pic_up_latlong.split(',')[0]), 
+        //                 longitude: JSON.parse(this.state.notification[this.state.slider1ActiveSlide].pic_up_latlong.split(',')[1]),
+        //             },
+        //             {
+        //                 latitude: JSON.parse(this.state.notification[this.state.slider1ActiveSlide].drop_latlong.split(',')[0]), 
+        //                 longitude: JSON.parse(this.state.notification[this.state.slider1ActiveSlide].drop_latlong.split(',')[1]),
+        //             },
+        //         ],
+        //     })
+        // }
+    }
+
+    async componentDidMount() { 
+        this.setState({
+            status: await AsyncStorage.getItem('@status'), 
+            preTime: 0,
+        });
+        //this.setState({ status: this.props.navigation.state.params.status})
+        // setInterval(()=>{
+        //     Geolocation.getCurrentPosition(
+        //         position => {
+        //             this.setState({
+        //                 region: {
+        //                     latitude: position.coords.latitude,
+        //                     longitude: position.coords.longitude,
+        //                     latitudeDelta: LATITUDE_DELTA,
+        //                     longitudeDelta: LONGITUDE_DELTA,
+        //                 },
+        //                 latitude: position.coords.latitude,
+        //                 longitude: position.coords.longitude,
+        //             });
+
+        //             var location = {
+        //                 lat: position.coords.latitude,
+        //                 lng: position.coords.longitude,
+        //             };
+
+        //             this.setState({
+        //                 marker: {
+        //                     latitude: position.coords.latitude,
+        //                     longitude: position.coords.longitude,
+        //                 }
+        //             })
+        //         },
+        //         (error) => console.log(error.message),
+        //     );
+        // },1000)
+    }
+
+    getNotification() {
+            var url = Config.baseUrl + Config.notificationdetails;
+            var reqJson = {
+                orderid : this.props.navigation.state.params.notification.orderid,
+            };
+
+            apiService.executeFormApi(
+                url,
+                "POST",
+                JSON.stringify(reqJson),
+                async (error, response) => {
+
+                    if (error !== "") {
+                        this.setState({ isLoading: false });
+                        viewUtils.showToast(error);
+                    }
+
+                    if (response !== null && response !== "") {
+                        this.setState({ 
+                            isLoading: false, 
+                        });
+                        if (response.status == "true") {
+                                const responseValue = response.data
+                                this.state.listData.push(responseValue);
+                                //this.state.notification.unshift(responseValue);
+                                this.setState({ 
+                                    notification: this.state.listData,
+                                    orderid : this.props.navigation.state.params.notification.orderid,
+                                    vehicleid : this.props.navigation.state.params.notification.vehicleid,
+                                    driverid : this.props.navigation.state.params.notification.driverid,
+                                    slider1ActiveSlide: this.state.notification.length - 1
+                                })
+
+                                var min = new Date().getMinutes();
+                                var sec = new Date().getSeconds();
+                                console.log('time==>',min,'-',sec)
+                                console.log('Data ===>' , this.state.notification)
+
+                                // const responseValue = response.data;
+                            // this.state.listData.push(responseValue);
+                            // this.setState({ notification: this.state.listData})
+                            // console.log('notification==>',this.state.notification);  
+                            // //console.log(this.state.notification)
+                        } else {
+                            viewUtils.showToast(response.message.trim());
+                        }
+                    }
+            });
+    }
+
+    _render = () => {
+        // alert(this.state.orderid)
+        // Get data from firebase database
+        
+        // itemRef.on('value', (snapshot) => {
+        //     let data = snapshot.val();
+        //     let items = Object.values(data);
+        //     //console.log('items----->',items)
+        //     this.setState({items});
+        // });
+
+        // update live lat long to firebase 
+        addItem(this.state.driverid,this.state.latitude,this.state.longitude)
+        this.props.navigation.navigate('RideDetail',{ orderid:this.state.orderid, vehicleid: this.state.vehicleid, driverid: this.state.driverid})
+    }
+
+    ignor = (index) => {
+        console.log('notification===>',this.state.banner)
+        this.setState({ banner : this.state.banner.splice(index, 1) })
+        console.log('notification===>',this.state.banner)
+    }
+      
+    remove_post_on_list = (id, index) => {
+        var data = this.state.banner.filter(itemValue => itemValue.id == id);
+        this._slider1Ref.snapToItem(this.state.banner.length-2, true);
+        this.setState({
+            preTime: data[0].accept_time,
+            banner: this.state.banner.filter(item => item.id != id),
+        })
+        console.log('pre time===>',this.state.preTime)
+        console.log('notification===>',this.state.banner)
+
+        var min = new Date().getMinutes();
+        var sec = new Date().getSeconds();
+        console.log('time==>',min,'-',sec)
+
+    }     
+
+    _renderItemWithParallax({ item, index }) {
+        const array = this.state.banner.length;
+        //console.log('array',this.state.banner)
+        //console.log('time->',time)
+        return (
+            // <BoxShadow setting={shadowOpt}>
+            <View style={styles.jobContainer} >
+                <View style={styles.header}>
+                    <View style={styles.imageView}>
+                        {item.customer_profile == "" ? 
+                        <Image source={require('../../../assets/img/user.png')} style={styles.image} />
+                        : <Image source={{uri: item.customer_profile}} style={styles.image} /> }
+                    </View>
+                    <View style={styles.nameDiv}>
+                        <Text style={styles.name}>{index+ item.id +item.customer_name}</Text>
+                        <View style={styles.paymentMethodDiv}>
+                            <Text style={styles.paymentMethod}> {item.payment_method} </Text>
+                        </View>
+                    </View>
+                    <View style={styles.priceDiv}>
+                        <Text style={styles.price}>₹ {item.total_order_price}</Text>
+                        <Text style={styles.distance}>{item.order_distance}</Text>
+                    </View>
+                </View>
+                <View style={styles.detailDiv}>
+                    <View style={styles.centerContainer}>
+                        <View style={{ width: width * 0.7 }}>
+                            <View style={[styles.locationNav, { marginTop: 5 }]}>
+                                <View style={styles.timeline}>
+                                    <View style={styles.line}>
+                                        <View style={[styles.topLine, styles.hiddenLine]} />
+                                        <View style={styles.bottomLine} />
+                                    </View>
+                                    <View style={[styles.dot, { backgroundColor: Color.green }]} />
+                                </View>
+                                <View style={styles.content}>
+                                    <Text style={styles.locationTitle}>{item.pic_up_location}</Text>
+                                </View>
+                            </View>
+                            <View style={[styles.locationNav, { marginBottom: 5 }]}>
+                                <View style={styles.timeline}>
+                                    <View style={styles.line}>
+                                        <View style={styles.topLine} />
+                                        <View style={[styles.bottomLine, styles.hiddenLine]} />
+                                    </View>
+                                    <View style={[styles.dot, { backgroundColor: Color.red }]} />
+                                </View>
+                                <View style={styles.content}>
+                                    <Text style={styles.locationTitle}>{item.drop_location}</Text>
+                                </View>
+                            </View>
+                        </View>
+                        <View style={{ width: width * 0.15, alignItems: 'center', justifyContent: 'center' }}>
+                            <CountdownCircleTimer
+                                isPlaying
+                                key={item.id}
+                                duration={item.accept_time}
+                                initialRemainingTime={item.accept_time}  // - this.state.preTime
+                                colors={Color.dark_blue}
+                                radius={10}
+                                size={width * 0.12}
+                                strokeWidth={5}
+                                onComplete={() => {
+                                    this.remove_post_on_list(item.id)
+                                }}
+                            >
+                            {({ remainingTime, animatedColor }) => {
+                                const minutes = Math.floor((remainingTime % 3600) / 60);
+                                const seconds = remainingTime % 60
+                                return (
+                                    <Animated.Text style={{ color: animatedColor }}>
+                                    {`${minutes}:${seconds}`}
+                                    </Animated.Text>
+                                )
+                            }}
+                            </CountdownCircleTimer>
+                        </View>
+                    </View>
+                    <View style={styles.btnContainer}>
+                        <TouchableHighlight style={styles.button1} underlayColor="transparent" onPress={() => this.ignor(index)}>
+                            <Text style={styles.buttonTitle1}> Ignor </Text>
+                        </TouchableHighlight>
+                        <TouchableHighlight underlayColor="transparent" style={styles.button2} onPress={() => this._render()} >
+                            <Text style={styles.buttonTitle2}> Accept </Text>
+                        </TouchableHighlight>
+                    </View>
+                </View>
+            </View>        
+            // </BoxShadow>
+        );
+    }
+
+    toggle = async () => {
+        Geolocation.getCurrentPosition(
+            async position => {
+                this.setState({ isLoading: true }, async () => {
+                    console.log('latitude', position.coords.latitude);
+                    console.log('longitude', position.coords.longitude);
+                    this.setState({
+                        region: {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            latitudeDelta: LATITUDE_DELTA,
+                            longitudeDelta: LONGITUDE_DELTA,
+                        },
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        marker: {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                        }
+                    })
+                    console.log('latitude', position.coords.latitude);
+                    console.log('longitude', position.coords.longitude);
+                    console.log(this.state.marker);
+                    var location = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                    };
+
+                    Geocoder.geocodePosition(location).then(res => {
+                        //console.log(res[0].formattedAddress)
+                        this.setState({ locationName: res[0].subLocality })
+                    })
+                        .catch(err => console.warn(err))
+
+                    await AsyncStorage.getItem('@status') == "Offline" || await AsyncStorage.getItem('@status') == null ? await AsyncStorage.setItem('@status', "Online") : await AsyncStorage.setItem('@status', "Offline")
+
+                    var url = Config.baseUrl + Config.driveronlineoffline;
+                    var reqJson = {
+                        driverid: await AsyncStorage.getItem('@userid'),
+                        latitudes: this.state.latitude,
+                        longitudes: this.state.longitude,
+                        status: await AsyncStorage.getItem('@status'),
+                    };
+
+                    apiService.executeFormApi(
+                        url,
+                        "POST",
+                        JSON.stringify(reqJson),
+                        async (error, response) => {
+
+                            if (error !== "") {
+                                this.setState({ isLoading: false });
+                                //viewUtils.showToast(error);
+                            }
+
+                            if (response !== null && response !== "") {
+                                console.log('main', response)
+                                if (response.message == "Successfully Offline" || response.status == "false") {
+                                    this.setState({ isLoading: false })
+                                    this.props.navigation.navigate('Main')
+                                } else {
+                                    this.setState({ isLoading: false });
+                                    this.props.navigation.navigate('Job');
+                                    viewUtils.showToast(response.message)
+                                }
+                            }
+                        })
+                })
+            },
+            error => viewUtils.showToast(error.message),
+            this.setState({ isLoading: false }),
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 }
+        );
+    }
+
+    currentLocation(){
+    //     if (this.state.isShowLocation == true)
+    //     {
+    //         this.setState({
+    //             isShowLocation:false,
+    //             forceRefresh: Math.floor(Math.random() * 100)
+    //         })
+    //     }
+    //     else{
+    //         this.setState({
+    //             isShowLocation:true,
+    //             forceRefresh: Math.floor(Math.random() * 100)
+    //         })
+    //     }
+    }
+
+    render() {
+        const { region, pulse, locationName, slider1ActiveSlide } = this.state;
+        return (
+            <View style={styles.container} >
+                <GeneralStatusBar backgroundColor={this.state.isModalVisible ? Color.transparent : Color.white} barStyle="dark-content" />
+                <Spinner visible={this.state.isLoading} textContent={''} />
+
+                <Header
+                    //status={this.state.status}
+                    //switchOn={true}
+                    onMenu={() => this.props.navigation.toggleDrawer()}
+                    onPress={() => this.toggle()}
+                />
+
+                {/* <View style={styles.pickMapContainer}>
+                    {this.state.notification.length == 0 ?
+                        <MapView
+                            style={styles.pickMap}
+                            region={region}
+                            provider={PROVIDER_GOOGLE}
+                            customMapStyle={RetroMapStyles}
+                            ref={c => this.mapView = c}
+                                        
+                            onRegionChangeComplete={this.onRegionChange}
+                            showsIndoorLevelPicker={true}
+                            onRegionChange={() => this.setState({ pulse: 0 })}
+                            followsUserLocation={false}
+                            // key={this.state.forceRefresh}
+                            // gestureHandling="greedy"
+                        >
+                        </MapView>
+                    :
+                    <MapView
+                        style={styles.pickMap}
+                        initialRegion={region}
+                        provider={PROVIDER_GOOGLE}
+                        customMapStyle={RetroMapStyles}
+                        ref={c => this.mapView = c}
+                        
+                        onRegionChangeComplete={this.onRegionChange}
+                        showsIndoorLevelPicker={true}
+                        onRegionChange={() => this.setState({ pulse: 0 })}
+                        followsUserLocation={false}
+                        // key={this.state.forceRefresh}
+                        // gestureHandling="greedy"
+                    > */}
+                        {/* {this.state.coordinates.map((coordinate, index) =>
+                            <MapView.Marker key={`coordinate_${index}`} coordinate={coordinate} image={index == 0 ? marker : markerDrop} />
+                        )} */}
+                        {/* {this.state.coordinates.map((marker, index) =>
+                            <MapView.Marker coordinate={marker}>
+                                <Image
+                                    key={`coordinate_${index}`}
+                                    source={index == 0 ? require('../../../assets/img/pin_pick.png') : require('../../../assets/img/pin_drop.png')}
+                                    style={{ width: width * 0.06, height: width * 0.06 }}
+                                />
+                            </MapView.Marker>
+                        )} */}
+                        {/* {this.state.banner[this.state.slider1ActiveSlide].map((marker, index) =>
+                            console.log(marker.pickup_lat_long,marker.drop_lat_long)
+                            // <MapView.Marker coordinate={marker.pickup_lat_long,marker.drop_lat_long}>
+                            //     <Image
+                            //         key={`coordinate_${index}`}
+                            //         source={index == 0 ? require('../../../assets/img/pin_pick.png') : require('../../../assets/img/pin_drop.png')}
+                            //         style={{ width: width * 0.06, height: width * 0.06 }}
+                            //     />
+                            // </MapView.Marker>
+                        )} */}
+
+                        {/* {(this.state.coordinates.length >= 2) && (
+                            <MapViewDirections
+                                origin={this.state.coordinates[0]}
+                                waypoints={(this.state.coordinates.length > 2) ? this.state.coordinates.slice(1, -1) : null}
+                                destination={this.state.coordinates[this.state.coordinates.length - 1]}
+                                apikey={GOOGLE_MAPS_APIKEY}
+                                strokeWidth={3}
+                                strokeColor={Color.dark_blue}
+                                optimizeWaypoints={true}
+                                onStart={(params) => {
+                                    console.log(`Started routing between "${params.origin}" and "${params.destination}"`);
+                                }}
+                                onReady={result => {
+                                    console.log('Distance: ${result.distance} km')
+                                    console.log('Duration: ${result.duration} min.')
+                                    this.mapView.fitToCoordinates(result.coordinates, {
+                                        edgePadding: {
+                                            right: (width / 20),
+                                            bottom: (height / 20),
+                                            left: (width / 20),
+                                            top: (height / 20),
+                                        }
+                                    });
+                                }}
+                                onError={(errorMessage) => {
+                                    // console.log('GOT AN ERROR');
+                                }}
+                            />
+                        )} */}
+                    {/* </MapView> }
+                </View> */}
+
+                {/* {this.state.notification.length == 0 
+                ?    <View style={[styles.mapImageContainer,]}>
+                        <TouchableHighlight underlayColor="transparent" onPress={()=> this.currentLocation}>
+                            <Image source={require('../../../assets/img/location.png')}
+                                style={{ width: width * 0.15, height: width * 0.15 }} />
+                        </TouchableHighlight>
+                    </View>
+                :   <View style={[styles.mapImageContainer, {height: height * 0.36,}]}>
+                        <TouchableHighlight underlayColor="transparent" onPress={()=> this.currentLocation}>
+                            <Image source={require('../../../assets/img/location.png')}
+                                style={{ width: width * 0.15, height: width * 0.15 }} />
+                        </TouchableHighlight>
+                    </View>
+                } */}
+
+                <View style={styles.carouselContainer}>
+                    <Carousel
+                        extraData={this.state}
+                        ref={c => this._slider1Ref = c}
+                        data={this.state.banner}
+                        renderItem={this._renderItemWithParallax.bind(this)}
+                        sliderWidth={sliderWidth}
+                        slideHeight={width}
+                        itemWidth={itemWidth}
+                        hasParallaxImages={true}
+                        firstItem={this.state.banner.length-1}
+                        inactiveSlideScale={0.94}
+                        inactiveSlideOpacity={0.7}
+                        inactiveSlideShift={20}
+                        containerCustomStyle={styles.slider}
+                        contentContainerCustomStyle={styles.sliderContentContainer}
+                        removeClippedSubviews={false}
+                        onSnapToItem={(index) => this.setState({ slider1ActiveSlide: index })}
+                        layout={'tinder'} layoutCardOffset={`-13`}
+                    />                
+                </View>
+            </View >
+        );
+    }
+}
+
+
+
+

@@ -1,0 +1,196 @@
+import * as React from 'react';
+import {
+    Text,
+    View,
+    StyleSheet,
+    Image,
+    Dimensions,
+    StatusBar,
+    Alert,
+    AppState
+} from 'react-native';
+import { StackActions, NavigationActions } from 'react-navigation';
+import AsyncStorage from '@react-native-community/async-storage';
+import firebase, { notifications } from 'react-native-firebase';
+import Geolocation from '@react-native-community/geolocation';
+//import PushNotificationAndroid from 'react-native-push-notification';
+
+/* common components */
+import GeneralStatusBar from '../../component/statusbar/index';
+import Color from '../../component/color';
+import Font from '../../component/font'
+import styles from './styles';
+import ApiService from "../../config/ApiService";
+import Utility from "../../config/utility";
+
+var { width, height } = Dimensions.get('window');
+
+export default class Splash extends React.PureComponent {
+    constructor(props) {
+        super(props);
+        apiService = new ApiService();
+        viewUtils = new Utility();
+        this.state = {
+            appState: AppState.currentState,
+            fcmToken: null,
+            status: '',
+
+            notification: []
+        }
+    }
+
+    async componentWillMount() {
+        this.createNotificationListeners();
+    }
+
+    async componentDidMount() {
+        this.checkPermission();
+        //console.log('component',this.state.notification)
+
+        this.timeoutHandle = setTimeout(async () => {
+            //console.log('notification',await AsyncStorage.getItem('@userid'))
+            if (!await AsyncStorage.getItem('@userid')) {
+                //console.log(await AsyncStorage.getItem('@status'))
+
+                this.props.navigation.reset([ NavigationActions.navigate({routeName: 'Intro',})], 0)
+                // await AsyncStorage.getItem('@status') == "Online"
+                //     ? this.props.navigation.reset([NavigationActions.navigate({routeName: 'Job',})], 0)
+                //     : this.props.navigation.reset([ NavigationActions.navigate({routeName: 'Main',})], 0)
+            } else {
+                await AsyncStorage.getItem('@status') == "Online"
+                    ? this.props.navigation.reset([NavigationActions.navigate({routeName: 'Job',})], 0)
+                    : this.props.navigation.reset([NavigationActions.navigate({routeName: 'Main',})], 0)
+            }
+        }, 2000);
+    }
+
+    /* chaeck the user has messaging permission for this app */
+    async checkPermission() {
+        const enabled = await firebase.messaging().hasPermission();
+        if (enabled) {
+            this.getToken();
+        } else {
+            this.requestPermission();
+        }
+    }
+
+    /* Returns an FCM token for this device. Optionally you can specify a custom authorized entity or scope to tailor tokens to your own use-case. */
+    async getToken() {
+        let fcmToken = await AsyncStorage.getItem('@fcmToken');
+        this.setState({ fcmToken: fcmToken });
+        console.log("fcmToken ===", fcmToken)
+        if (!fcmToken) {
+            fcmToken = await firebase.messaging().getToken();
+            console.log("fcmToken ===", fcmToken)
+            if (fcmToken) {
+                this.setState({ fcmToken: fcmToken });
+                await AsyncStorage.setItem('@fcmToken', fcmToken);
+            }
+        }
+    }
+
+    /* On iOS, messaging permission must be requested by the current application before messages can be received or sent. */
+    async requestPermission() {
+        try {
+            await firebase.messaging().requestPermission();
+            this.getToken();
+        } catch (error) {
+            console.log('permission rejected');
+        }
+    }
+
+    // async createNotificationListeners() {
+    //     console.log('notification listener')
+    //     /* Triggered when a particular notification has been received in foreground */
+    //     this.notificationfListener = firebase.notifications().onNotification((notification) => {
+    //         if (Platform.OS == 'ios') {
+    //             var notificationTitle = notification.title;
+    //             const customObject = JSON.parse(notification.data['gcm.notification.category']);
+    //             this.notificationWhenAppInForegroundIos(notification);
+    //         }
+    //     });
+
+    //     /* If your app is in background, you can listen for when a notification is clicked / tapped / opened as follows: */
+    //     this.notificationOpenedListener = firebase.notifications().onNotificationOpened((notificationOpen) => {
+    //         console.log("notificationListener called for background application:", notificationOpen);
+    //         //console.log('data',notificationOpen.notification)
+            
+    //         if (Platform.OS == "android") {
+    //             let notification = notificationOpen.notification._data
+    //             console.log(notification)
+    //             this.props.navigation.navigate('Job',{ notification: notification})
+    //             //this.setState({ notification: notification._data })
+    //             //this.props.navigation.navigate('Job',{ notification: notification._data })
+    //             //Actions.Job(notification._data)
+    //         } else {
+    //             let notification = notificationOpen.notification
+    //             const customObject = JSON.parse(notification.data['gcm.notification.category']);
+    //             //Actions.jobDetail(customObject.job)
+    //         }
+    //     });
+
+    //     /* If your app is closed, you can check if it was opened by a notification being clicked / tapped / opened as follows: */
+    //     const notificationOpen = await firebase.notifications().getInitialNotification();
+
+    //     if (notificationOpen) {
+    //         //alert('hi')
+    //         let notification = notificationOpen.notification
+    //         if (Platform.OS == "android") {
+    //             console.log("notificationOpen closed", notificationOpen.notification)
+    //             //this.setState({ notification: notificationOpen.notification._data })
+    //             this.props.navigation.push('Job',{ notification: notification._data })
+    //             //Actions.jobDetail(notification.data.job)
+    //         } else {
+    //             const customObject = JSON.parse(notification.data['gcm.notification.category']);
+    //             var type = customObject.type;
+    //             //Actions.jobDetail(customObject.job)
+    //         }
+    //     }
+
+    //     //alert(this.state.appState)
+    //     this.messageListener = firebase.messaging().onMessage(async (message) => {
+    //         console.log('message listener')
+    //         if (Platform.OS == 'android') {
+    //             const { appState } = this.state;
+    //             if (appState === "active") {
+    //                 const channel = new firebase.notifications.Android.Channel('ALL', 'Flashpik', firebase.notifications.Android.Importance.Max)
+    //                     .setDescription('Flashpik Notification');
+    //                 const badgeCount = await firebase.notifications().getBadge();
+
+    //                 const localNotification = new firebase.notifications.Notification()
+    //                     .setNotificationId(message.messageId)
+    //                     .setTitle(message.data.title)
+    //                     .setBody(message.data.message)
+    //                     .setData(message.data)
+
+    //                     .android.setChannelId(channel.channelId)
+    //                     .android.setAutoCancel(true)
+    //                     .android.setSmallIcon('ic_launcher')
+    //                     .android.setCategory(firebase.notifications.Android.Category.Alarm)
+    //                     .android.setPriority(firebase.notifications.Android.Priority.High);
+
+    //                 firebase.notifications().android.createChannel(channel);
+    //                 firebase.notifications().displayNotification(localNotification);
+    //                 firebase.notifications().setBadge(badgeCount);
+    //             }
+    //         }
+    //     });
+    // }
+
+    render() {
+        return (
+            <View style={styles.container}>
+                <GeneralStatusBar backgroundColor={Color.transparent} barStyle="light-content" />
+                <Image source={require('../../../assets/img/app_logo.png')} style={styles.logo} />
+                <Image source={require('../../../assets/img/flashpik.png')} style={styles.flashpik} />
+                <View style={styles.bottom_view}>
+                    <Image source={require('../../../assets/img/bottom_layer.png')} style={styles.bottom_image} />
+                </View>
+            </View>
+
+        );
+    }
+}
+
+
+
